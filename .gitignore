@@ -1,0 +1,78 @@
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# NuGet Packages
+packages/
+*.nupkg
+*.snupkg
+**/packages/*.nupkg
+
+# Model files (too large for git)
+models/
+*.bin
+*.model
+*.onnx
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+*.old
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+*.csproj.user
+*.userosscache
+*.sln.docstates
+
+# Whisper executable (if large)
+whisper.exe
+whisper-cli.exe
+main.exe
+
+# Vosk native DLLs (will be restored from NuGet)
+*.dylib
+libvosk*.dll
+
+# Output files
+*.exe
+*.dll
+*.pdb
+*.xml
+
+# But keep source files
+!*.cs
+!*.Designer.cs
+!*.resx
+!*.config
+!*.sln
+!*.csproj
+!*.md
