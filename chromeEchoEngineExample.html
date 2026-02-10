@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STT/TTS Full Test (Web Speech API)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 160px; padding: 10px; box-sizing: border-box; }
+    button { padding: 10px 12px; margin: 6px 6px 6px 0; }
+    .row { margin: 12px 0; }
+    .status { padding: 8px 10px; background: #f3f4f6; border-radius: 8px; }
+    .hint { color: #555; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 140px 1fr; gap: 10px; align-items: center; }
+    select, input[type="range"], input[type="number"] { width: 100%; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+    .hl {
+      border-left: 4px solid #e5e7eb;
+      padding: 8px 10px;
+      background: #fafafa;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <h2>Web Speech API STT / TTS 테스트 (고급 설정 포함)</h2>
+
+  <div class="row status" id="status">상태: 초기화 중...</div>
+  <div class="row hint" id="support"></div>
+
+  <h3>1) STT (SpeechRecognition)</h3>
+  <div class="row">
+    <button id="btnStart">🎤 STT 시작</button>
+    <button id="btnStop" disabled>🛑 STT 중지</button>
+
+    <label class="hint">
+      <input type="checkbox" id="chkInterim" checked />
+      중간결과(interim) 표시
+    </label>
+
+    <label class="hint" style="margin-left:10px;">
+      <input type="checkbox" id="chkContinuous" checked />
+      연속 인식(continuous)
+    </label>
+
+    <!-- ✅ 추가: STT 언어 선택 (TTS 언어와 분리) -->
+    <label class="hint" style="margin-left:10px;">
+      STT 언어:
+      <select id="sttLang" style="width:auto;">
+        <option value="ko-KR" selected>한국어 (ko-KR)</option>
+        <option value="en-US">영어 (en-US)</option>
+      </select>
+    </label>
+  </div>
+
+  <h3>2) 텍스트</h3>
+  <div class="row">
+    <textarea id="text" placeholder="여기에 STT 결과가 쌓이고, TTS로 읽을 텍스트도 입력할 수 있어요."></textarea>
+  </div>
+
+  <h3>3) TTS (speechSynthesis) - 음성/기타 설정</h3>
+  <div class="row grid">
+    <div><label for="lang">언어(lang)</label></div>
+    <div>
+      <select id="lang">
+        <option value="ko-KR" selected>ko-KR</option>
+        <option value="en-US">en-US</option>
+        <option value="ja-JP">ja-JP</option>
+        <option value="zh-CN">zh-CN</option>
+      </select>
+      <div class="hint">※ 실제 사용 가능한 voice는 OS/브라우저에 따라 달라요.</div>
+    </div>
+
+    <div><label for="voice">음성(voice)</label></div>
+    <div>
+      <select id="voice"></select>
+      <div class="hint">목록이 비어있으면 1~2초 후 다시 뜰 수 있어요(voiceschanged).</div>
+    </div>
+
+    <div><label for="rate">속도(rate)</label></div>
+    <div>
+      <input id="rate" type="range" min="0.5" max="2" step="0.1" value="1" />
+      <div class="hint">현재: <span id="rateVal">1.0</span></div>
+    </div>
+
+    <div><label for="pitch">피치(pitch)</label></div>
+    <div>
+      <input id="pitch" type="range" min="0" max="2" step="0.1" value="1" />
+      <div class="hint">현재: <span id="pitchVal">1.0</span></div>
+    </div>
+
+    <div><label for="volume">볼륨(volume)</label></div>
+    <div>
+      <input id="volume" type="range" min="0" max="1" step="0.05" value="1" />
+      <div class="hint">현재: <span id="volumeVal">1.00</span></div>
+    </div>
+
+    <div><label for="chunkLen">분할 길이</label></div>
+    <div>
+      <input id="chunkLen" type="number" min="80" max="500" step="10" value="180" />
+      <div class="hint">긴 텍스트를 자동 분할(대략 N자 단위). 끊김/오류 방지용.</div>
+    </div>
+
+    <div><label for="autoPick">자동 voice 선택</label></div>
+    <div>
+      <label class="hint">
+        <input type="checkbox" id="autoPick" checked />
+        언어에 맞는 voice 자동 선택
+      </label>
+      <div class="hint">언어 변경 시 해당 언어 voice를 우선으로 고릅니다.</div>
+    </div>
+
+    <div><label for="queueMode">대기열 모드</label></div>
+    <div>
+      <label class="hint">
+        <input type="checkbox" id="queueMode" />
+        기존 발화 취소하지 않고 이어 읽기(Queue)
+      </label>
+      <div class="hint">끄면 <code>cancel()</code> 후 새로 읽습니다.</div>
+    </div>
+
+    <div><label>컨트롤</label></div>
+    <div>
+      <button id="btnSpeak">🔊 읽기</button>
+      <button id="btnPause">⏸️ 일시정지</button>
+      <button id="btnResume">▶️ 재개</button>
+      <button id="btnCancel">✋ 취소</button>
+      <label class="hint" style="margin-left:10px;">
+        <input type="checkbox" id="chkBoundary" checked />
+        boundary(읽는 위치) 추적
+      </label>
+    </div>
+  </div>
+
+  <h3>4) 읽는 위치(하이라이트)</h3>
+  <div class="row hl" id="highlight">(TTS 시작하면 현재 읽는 위치를 표시합니다)</div>
+
+<script>
+(() => {
+  const statusEl = document.getElementById('status');
+  const supportEl = document.getElementById('support');
+  const textEl = document.getElementById('text');
+
+  // STT
+  const btnStart = document.getElementById('btnStart');
+  const btnStop  = document.getElementById('btnStop');
+  const chkInterim = document.getElementById('chkInterim');
+  const chkContinuous = document.getElementById('chkContinuous');
+  const sttLangEl = document.getElementById('sttLang'); // ✅ 추가
+
+  // TTS UI
+  const langEl = document.getElementById('lang');
+  const voiceEl = document.getElementById('voice');
+  const rateEl = document.getElementById('rate');
+  const pitchEl = document.getElementById('pitch');
+  const volumeEl = document.getElementById('volume');
+  const chunkLenEl = document.getElementById('chunkLen');
+  const autoPickEl = document.getElementById('autoPick');
+  const queueModeEl = document.getElementById('queueMode');
+
+  const rateVal = document.getElementById('rateVal');
+  const pitchVal = document.getElementById('pitchVal');
+  const volumeVal = document.getElementById('volumeVal');
+
+  const btnSpeak = document.getElementById('btnSpeak');
+  const btnPause = document.getElementById('btnPause');
+  const btnResume = document.getElementById('btnResume');
+  const btnCancel = document.getElementById('btnCancel');
+  const chkBoundary = document.getElementById('chkBoundary');
+
+  const hlEl = document.getElementById('highlight');
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const hasSTT = !!SpeechRecognition;
+  const hasTTS = !!window.speechSynthesis;
+
+  supportEl.textContent =
+    `지원 여부 → STT(SpeechRecognition): ${hasSTT ? 'OK' : 'NO'} / TTS(speechSynthesis): ${hasTTS ? 'OK' : 'NO'}`;
+
+  function setStatus(msg) { statusEl.textContent = '상태: ' + msg; }
+
+  function updateRanges() {
+    rateVal.textContent = Number(rateEl.value).toFixed(1);
+    pitchVal.textContent = Number(pitchEl.value).toFixed(1);
+    volumeVal.textContent = Number(volumeEl.value).toFixed(2);
+  }
+  rateEl.addEventListener('input', updateRanges);
+  pitchEl.addEventListener('input', updateRanges);
+  volumeEl.addEventListener('input', updateRanges);
+  updateRanges();
+
+  // -------------------- STT --------------------
+  let rec = null;
+  let isRecognizing = false;
+
+  function startSTT() {
+    if (!hasSTT) { alert('STT 미지원 브라우저입니다(Chrome 권장).'); return; }
+    if (isRecognizing) return;
+
+    rec = new SpeechRecognition();
+
+    // ✅ 핵심: STT 언어는 TTS(langEl)와 분리해서 선택
+    rec.lang = sttLangEl.value;
+
+    rec.continuous = chkContinuous.checked;
+
+    // ✅ 영어(en-US)에서 interim이 흔들리는 경우가 많아 자동으로 끔(원하면 아래 한 줄 수정 가능)
+    rec.interimResults = (rec.lang === 'ko-KR') ? chkInterim.checked : false;
+
+    // ✅ 후보 더 받기(영어 인식 개선에 도움될 수 있음)
+    rec.maxAlternatives = 5;
+
+    rec.onstart = () => {
+      isRecognizing = true;
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+      setStatus(`STT 인식 중... (lang=${rec.lang}) 마이크로 말해보세요.`);
+    };
+
+    rec.onresult = (event) => {
+      let finalText = '';
+      let interimText = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const r = event.results[i];
+        const t = r[0].transcript;
+        if (r.isFinal) finalText += t;
+        else interimText += t;
+      }
+
+      if (finalText.trim()) {
+        const sep = textEl.value && !textEl.value.endsWith('\n') ? '\n' : '';
+        textEl.value += sep + finalText.trim();
+      }
+      if (chkInterim.checked && interimText.trim()) {
+        setStatus(`STT 인식 중... (중간결과) ${interimText.trim()}`);
+      }
+    };
+
+    rec.onerror = (e) => {
+      console.error('STT 에러:', e.error);
+      setStatus(`STT 에러: ${e.error}`);
+      // 특정 오류는 자동 재시작하지 않음
+      if (e.error === 'not-allowed' || e.error === 'no-speech' || e.error === 'aborted') {
+        isRecognizing = false;
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        setStatus('STT 종료됨 (마이크 권한을 확인하세요)');
+      }
+    };
+    
+    rec.onend = () => {
+      // continuous 모드이고 사용자가 중지하지 않았으면 자동 재시작
+      if (rec.continuous && isRecognizing) {
+        try {
+          rec.start();
+          setStatus('STT 재시작 중...');
+        } catch (err) {
+          console.error('STT 재시작 실패:', err);
+          isRecognizing = false;
+          btnStart.disabled = false;
+          btnStop.disabled = true;
+          setStatus('STT 종료됨');
+        }
+      } else {
+        isRecognizing = false;
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        setStatus('STT 종료됨');
+      }
+    };
+
+    try {
+      rec.start();
+    } catch (err) {
+      console.error('STT 시작 실패:', err);
+      setStatus('STT 시작 실패: ' + err.message);
+      isRecognizing = false;
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+    }
+  }
+
+  function stopSTT() {
+    if (rec && isRecognizing) {
+      isRecognizing = false; // continuous 모드에서 자동 재시작 방지
+      rec.stop();
+      setStatus('STT 중지 요청...');
+    }
+  }
+
+  btnStart.addEventListener('click', startSTT);
+  btnStop.addEventListener('click', stopSTT);
+
+  // -------------------- TTS (voices) --------------------
+  function labelForVoice(v) {
+    const flags = [
+      v.localService ? 'local' : 'remote',
+      v.default ? 'default' : ''
+    ].filter(Boolean).join(', ');
+    return `${v.name} — ${v.lang}${flags ? ` (${flags})` : ''}`;
+  }
+
+  function fillVoiceList() {
+    if (!hasTTS) return;
+    const voices = speechSynthesis.getVoices() || [];
+    const cur = voiceEl.value;
+
+    voiceEl.innerHTML = '';
+    voices.forEach((v, idx) => {
+      const opt = document.createElement('option');
+      opt.value = String(idx);
+      opt.textContent = labelForVoice(v);
+      voiceEl.appendChild(opt);
+    });
+
+    // 복원
+    if (cur && voices[Number(cur)]) voiceEl.value = cur;
+
+    // 자동선택 옵션이 켜져있으면 현재 언어에 맞춰 선택
+    if (autoPickEl.checked) pickVoiceForLang(langEl.value);
+  }
+
+  function pickVoiceForLang(lang) {
+    if (!hasTTS) return;
+    const voices = speechSynthesis.getVoices() || [];
+    if (!voices.length) return;
+
+    let idx = voices.findIndex(v => v.lang === lang);
+
+    if (idx < 0) {
+      const base = lang.split('-')[0];
+      idx = voices.findIndex(v => v.lang && v.lang.startsWith(base));
+    }
+
+    if (idx < 0) idx = voices.findIndex(v => v.default);
+    if (idx < 0) idx = 0;
+
+    voiceEl.value = String(idx);
+  }
+
+  if (hasTTS) {
+    speechSynthesis.onvoiceschanged = () => fillVoiceList();
+    fillVoiceList();
+  }
+
+  langEl.addEventListener('change', () => {
+    if (autoPickEl.checked) pickVoiceForLang(langEl.value);
+  });
+
+  // -------------------- TTS speak / pause / resume / cancel --------------------
+  function splitText(text, maxLen) {
+    const chunks = [];
+    let s = text.trim();
+    if (!s) return chunks;
+
+    const limit = Math.max(80, Math.min(500, Number(maxLen) || 180));
+
+    while (s.length > limit) {
+      let cut = -1;
+
+      const re = /[\.!\?\n]/g;
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        if (m.index < limit) cut = m.index + 1;
+        else break;
+      }
+
+      if (cut < 0) {
+        cut = s.lastIndexOf(' ', limit);
+      }
+
+      if (cut < 0 || cut < 20) cut = limit;
+
+      chunks.push(s.slice(0, cut).trim());
+      s = s.slice(cut).trim();
+    }
+    if (s) chunks.push(s);
+    return chunks;
+  }
+
+  function renderHighlight(fullText, start, end) {
+    const a = fullText.slice(0, start);
+    const b = fullText.slice(start, end);
+    const c = fullText.slice(end);
+    const esc = (t) => t.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    hlEl.innerHTML = `${esc(a)}<mark>${esc(b || ' ')}</mark>${esc(c)}`;
+  }
+
+  let currentUtterances = [];
+  let fullTextForHighlight = '';
+  let globalOffset = 0;
+
+  function speak() {
+    if (!hasTTS) { alert('TTS 미지원 브라우저입니다.'); return; }
+
+    const raw = textEl.value.trim();
+    if (!raw) { alert('읽을 텍스트가 없습니다.'); return; }
+
+    const queueMode = queueModeEl.checked;
+
+    if (!queueMode) {
+      speechSynthesis.cancel();
+    }
+
+    const voices = speechSynthesis.getVoices() || [];
+    const voiceIdx = Number(voiceEl.value);
+    const selectedVoice = voices[voiceIdx] || null;
+
+    const chunks = splitText(raw, chunkLenEl.value);
+    if (!chunks.length) return;
+
+    setStatus(`TTS 시작 (${chunks.length}개 조각)`);
+
+    // 원본 텍스트를 하이라이트용으로 사용
+    fullTextForHighlight = raw;
+    renderHighlight(fullTextForHighlight, 0, 0);
+
+    currentUtterances = [];
+    globalOffset = 0;
+    let chunkStartPositions = [0]; // 각 chunk의 시작 위치 저장
+
+    // 각 chunk의 시작 위치 계산
+    let pos = 0;
+    for (let i = 0; i < chunks.length - 1; i++) {
+      // 원본 텍스트에서 해당 chunk를 찾아 위치 계산
+      const chunkText = chunks[i];
+      const nextChunkText = chunks[i + 1];
+      
+      // 원본 텍스트에서 chunk의 실제 위치 찾기
+      let chunkPos = raw.indexOf(chunkText, pos);
+      if (chunkPos === -1) {
+        // 정확히 찾지 못하면 대략적인 위치 사용
+        chunkPos = pos;
+      }
+      pos = chunkPos + chunkText.length;
+      chunkStartPositions.push(pos);
+    }
+
+    chunks.forEach((chunk, i) => {
+      const u = new SpeechSynthesisUtterance(chunk);
+      u.lang = langEl.value;
+      if (selectedVoice) u.voice = selectedVoice;
+      u.rate = Number(rateEl.value);
+      u.pitch = Number(pitchEl.value);
+      u.volume = Number(volumeEl.value);
+
+      const chunkStart = chunkStartPositions[i] || 0;
+
+      u.onstart = () => {
+        setStatus(`TTS 읽는 중... (${i+1}/${chunks.length})`);
+        // chunk 시작 시 하이라이트 초기화
+        if (chkBoundary.checked) {
+          renderHighlight(fullTextForHighlight, chunkStart, chunkStart);
+        }
+      };
+
+      u.onend = () => {
+        if (i === chunks.length - 1) {
+          setStatus('TTS 완료');
+          // 마지막 chunk 종료 시 하이라이트 제거
+          if (chkBoundary.checked) {
+            renderHighlight(fullTextForHighlight, fullTextForHighlight.length, fullTextForHighlight.length);
+          }
+        }
+      };
+
+      u.onerror = (e) => {
+        setStatus('TTS 에러: ' + (e.error || 'unknown'));
+      };
+
+      if (chkBoundary.checked) {
+        u.onboundary = (e) => {
+          if (typeof e.charIndex === 'number' && e.charIndex >= 0) {
+            // chunk 내부의 charIndex를 원본 텍스트의 절대 위치로 변환
+            const absolutePos = Math.min(fullTextForHighlight.length, chunkStart + e.charIndex);
+            const end = Math.min(fullTextForHighlight.length, absolutePos + (e.charLength || 1));
+            renderHighlight(fullTextForHighlight, absolutePos, end);
+          }
+        };
+      }
+
+      currentUtterances.push(u);
+      speechSynthesis.speak(u);
+    });
+  }
+
+  function pauseSpeak() {
+    if (!hasTTS) return;
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+      speechSynthesis.pause();
+      setStatus('TTS 일시정지');
+    }
+  }
+
+  function resumeSpeak() {
+    if (!hasTTS) return;
+    if (speechSynthesis.paused) {
+      speechSynthesis.resume();
+      setStatus('TTS 재개');
+    }
+  }
+
+  function cancelSpeak() {
+    if (!hasTTS) return;
+    speechSynthesis.cancel();
+    setStatus('TTS 취소');
+    hlEl.textContent = '(TTS 시작하면 현재 읽는 위치를 표시합니다)';
+  }
+
+  btnSpeak.addEventListener('click', speak);
+  btnPause.addEventListener('click', pauseSpeak);
+  btnResume.addEventListener('click', resumeSpeak);
+  btnCancel.addEventListener('click', cancelSpeak);
+
+  setStatus('준비 완료');
+})();
+</script>
+</body>
+</html>
