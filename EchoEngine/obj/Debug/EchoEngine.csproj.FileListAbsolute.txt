@@ -54,4 +54,3 @@ D:\Project\EchoEngine\EchoEngine\obj\Debug\EchoEngine.csproj.CoreCompileInputs.c
 D:\Project\EchoEngine\EchoEngine\obj\Debug\EchoEngine.csproj.CopyComplete
 D:\Project\EchoEngine\EchoEngine\obj\Debug\EchoEngine.exe
 D:\Project\EchoEngine\EchoEngine\obj\Debug\EchoEngine.pdb
-D:\Project\EchoEngine\EchoEngine\obj\Debug\EchoEngine.csproj.AssemblyReference.cache
