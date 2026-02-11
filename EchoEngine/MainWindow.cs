@@ -40,5 +40,21 @@ namespace EchoEngine
             form.ShowDialog();
          }
       }
+
+      private void btnChrome_Click(object sender, EventArgs e)
+      {
+         using (var form = new ChromeForm())
+         {
+            form.ShowDialog();
+         }
+      }
+
+      private void btnAzure_Click(object sender, EventArgs e)
+      {
+         using (var form = new AzureForm())
+         {
+            form.ShowDialog();
+         }
+      }
    }
 }
